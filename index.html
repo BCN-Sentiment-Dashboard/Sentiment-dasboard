@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brand Sentiment Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Mono:wght@400;700&display=swap');
+:root{--neg:#8B1A1A;--neu:#B8B0A8;--pos:#8FBFAB;--bg:#FAFAF8;--tx:#1A1A1A;--tx2:#555;--tx3:#888;--bdr:#E0DDD8;--acc:#C23028;--card:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.hdr{background:linear-gradient(135deg,#1A1A1A,#2A2A2A);color:#fff;padding:24px 40px 20px}
+.hdr-tags{display:flex;gap:0;margin-bottom:10px}
+.tag{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:3px;text-transform:uppercase;padding:3px 14px;font-weight:700}
+.tag-r{background:var(--acc)}.tag-g{background:#777}
+.hdr-row{display:flex;align-items:flex-start;justify-content:space-between}
+.hdr h1{font-size:19px;font-weight:700;line-height:1.35;max-width:820px}
+.dir{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;opacity:.55;white-space:nowrap;margin-top:4px}
+.ctrl{padding:14px 40px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.tab-group{display:flex;gap:0;border:1.5px solid var(--bdr);border-radius:8px;overflow:hidden}
+.tab-btn{padding:8px 20px;font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif;color:var(--tx2);transition:all .15s;white-space:nowrap}
+.tab-btn:not(:last-child){border-right:1.5px solid var(--bdr)}
+.tab-btn.active{background:var(--acc);color:#fff}
+.tab-btn:hover:not(.active){background:#f5f4f2}
+.mkt-group{display:flex;align-items:center;gap:10px;margin-left:10px}
+.mkt-group label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--tx3)}
+.pills{display:flex;gap:4px;flex-wrap:wrap}
+.pill{padding:5px 13px;border:1.5px solid var(--bdr);border-radius:18px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;background:transparent;font-family:'DM Sans',sans-serif;color:var(--tx2);white-space:nowrap}
+.pill:hover{border-color:var(--acc);color:var(--acc)}.pill.active{background:var(--acc);color:#fff;border-color:var(--acc)}
+.upload-bar{padding:12px 40px;background:#F5F4F1;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.upload-btn{background:var(--tx);color:#fff;border:none;padding:9px 20px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;transition:background .15s}
+.upload-btn:hover{background:#333}
+.file-info{font-size:11px;color:var(--tx3);font-family:'Space Mono',monospace}
+.file-info .fname{color:var(--tx);font-weight:700}
+#fileInput{display:none}
+.chart-area{padding:32px 40px 20px}
+.chart-sub{font-size:12.5px;color:var(--tx2);margin-bottom:28px}.chart-sub span{font-weight:700;color:var(--tx)}
+.chart-frame{position:relative;padding-left:48px;padding-top:38px}
+.y-ax{position:absolute;left:0;top:0;bottom:0;width:44px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;padding-right:6px;pointer-events:none}
+.y-t{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx3);line-height:1;transform:translateY(-30px)}
+.grid{position:absolute;left:48px;right:0;top:0;bottom:0;pointer-events:none}
+.gl{position:absolute;left:0;right:0;height:1px;background:#EDECEA}.gl.dash{background:none;border-top:2px dashed var(--acc);opacity:.35}
+.bars-row{display:flex;align-items:flex-end;justify-content:center;height:340px;position:relative;z-index:2;gap:5%}
+.bar-col{display:flex;flex-direction:column;align-items:center;flex:1;max-width:130px;min-width:60px}
+.bar-n{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;margin-bottom:5px}
+.stack{width:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:2px}
+.seg{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;overflow:hidden;transition:height .5s cubic-bezier(.25,.46,.45,.94)}
+.seg.sn{background:var(--neg)}.seg.su{background:var(--neu)}.seg.sp{background:var(--pos);color:var(--tx)}
+.seg .lb{opacity:0;transition:opacity .25s .4s}.seg.show .lb{opacity:1}
+.blbl{margin-top:10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;line-height:1.25;min-height:28px;display:flex;align-items:center;justify-content:center}
+.bot-row{display:flex;justify-content:center;gap:5%;padding-left:48px;margin-top:2px}
+.bot-cell{flex:1;max-width:130px;min-width:60px;text-align:center}
+.bot-title{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin-bottom:1px}
+.bot-val{font-family:'Space Mono',monospace;font-size:11.5px;font-weight:700}
+.bot-val.red{color:var(--neg)}.bot-val.grn{color:#2E7D5B}
+.legend{display:flex;justify-content:center;gap:28px;margin-top:28px;padding-top:16px;border-top:1px solid var(--bdr)}
+.leg-i{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2)}
+.leg-d{width:13px;height:13px;border-radius:2px}
+.note{text-align:center;margin-top:14px;font-size:9.5px;color:#aaa;font-style:italic;line-height:1.6}
+.theme-frame{padding:32px 40px 20px}
+.theme-brands{display:flex;justify-content:center;gap:4%;flex-wrap:wrap}
+.theme-brand-group{display:flex;flex-direction:column;align-items:center;flex:1;min-width:160px;max-width:220px}
+.theme-brand-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:8px}
+.theme-pair{display:flex;gap:8px;width:100%;justify-content:center}
+.theme-col{display:flex;flex-direction:column;align-items:center;width:48%}
+.theme-col-label{font-size:9px;font-weight:600;color:var(--tx2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.theme-stack{width:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:2px}
+.theme-seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;overflow:hidden;transition:height .5s cubic-bezier(.25,.46,.45,.94)}
+.theme-seg .lb{opacity:0;transition:opacity .25s .4s}.theme-seg.show .lb{opacity:1}
+.theme-n{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;margin-bottom:4px}
+.no-data{display:flex;align-items:center;justify-content:center;height:100%;font-size:10px;color:var(--tx3);font-style:italic;border:1px dashed var(--bdr);border-radius:4px;text-align:center;padding:8px}
+.theme-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px;padding-top:14px;border-top:1px solid var(--bdr)}
+.tl-i{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--tx2)}
+.tl-d{width:11px;height:11px;border-radius:2px}
+.hidden{display:none !important}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal{background:#fff;border-radius:12px;padding:32px 36px;max-width:620px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:6px}
+.modal .desc{font-size:12px;color:var(--tx3);margin-bottom:22px;line-height:1.5}
+.modal .sheet-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--bdr)}
+.modal .sheet-row label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);min-width:50px}
+.modal .sheet-row select{flex:1;padding:7px 10px;border:1.5px solid var(--bdr);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px}
+.map-section{margin-bottom:18px}
+.map-section h3{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.map-section h3 .badge{font-size:9px;background:var(--acc);color:#fff;padding:2px 8px;border-radius:10px;font-weight:700}
+.map-section h3 .badge.opt{background:var(--neu);color:var(--tx)}
+.map-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.map-item{display:flex;flex-direction:column;gap:3px}
+.map-item label{font-size:10px;font-weight:600;color:var(--tx2)}
+.map-item select{padding:7px 10px;border:1.5px solid var(--bdr);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;background:#fff}
+.map-item select.mapped{border-color:#2E7D5B;background:#f0faf5}
+.theme-picks{margin-top:10px}
+.theme-picks .tp-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.theme-picks .tp-row input{width:16px;height:16px;accent-color:var(--acc)}
+.theme-picks .tp-row span{font-size:11px}
+.modal-actions{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+.modal-actions button{padding:10px 24px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-cancel{background:#eee;color:var(--tx2)}.btn-cancel:hover{background:#ddd}
+.btn-go{background:var(--acc);color:#fff}.btn-go:hover{background:#a52520}
+.preview-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:10px}
+.preview-table th{background:#f5f4f1;padding:5px 8px;text-align:left;font-weight:700;border-bottom:1px solid var(--bdr)}
+.preview-table td{padding:4px 8px;border-bottom:1px solid #f0efec;color:var(--tx2)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-tags"><span class="tag tag-r">BRAND ENGAGEMENT</span><span class="tag tag-g">REVIEW ANALYSIS</span></div>
+  <div class="hdr-row">
+    <h1 id="title">Brand mentions – by sentiment type</h1>
+    <div class="dir">/ DIRECTIONAL</div>
+  </div>
+</div>
+
+<div class="upload-bar">
+  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">↑ Upload New Excel</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleUpload(this)">
+  <div class="file-info" id="fileInfo">Using sample dataset · Upload a new Excel to replace data</div>
+</div>
+
+<div class="ctrl">
+  <div class="tab-group">
+    <button class="tab-btn active" data-view="overall">Overall Sentiment</button>
+    <button class="tab-btn" data-view="market">Market Sentiment</button>
+    <button class="tab-btn" data-view="themes">Share of Themes</button>
+  </div>
+  <div class="mkt-group hidden" id="mktGroup">
+    <label>Market</label>
+    <div class="pills" id="pills"></div>
+  </div>
+</div>
+
+<div class="chart-area" id="sentView">
+  <div class="chart-sub" id="chartSub">Brand mentions – by sentiment type</div>
+  <div class="chart-frame">
+    <div class="y-ax"><span class="y-t">100%</span><span class="y-t">80%</span><span class="y-t">60%</span><span class="y-t">40%</span><span class="y-t">20%</span><span class="y-t">0</span></div>
+    <div class="grid"><div class="gl" style="top:0%"></div><div class="gl" style="top:20%"></div><div class="gl dash" style="top:40%"></div><div class="gl" style="top:60%"></div><div class="gl" style="top:80%"></div><div class="gl" style="top:100%"></div></div>
+    <div class="bars-row" id="barsRow"></div>
+  </div>
+  <div class="bot-row" id="ratingRow"></div>
+  <div class="bot-row" id="netRow"></div>
+  <div class="legend">
+    <div class="leg-i"><div class="leg-d" style="background:var(--pos)"></div>Positive</div>
+    <div class="leg-i"><div class="leg-d" style="background:var(--neu)"></div>Neutral</div>
+    <div class="leg-i"><div class="leg-d" style="background:var(--neg)"></div>Negative</div>
+  </div>
+  <div class="note">Note: Labels with less than 4% have been excluded from the chart. One verbatim can be tagged to multiple themes.<br>Source: Review Data</div>
+</div>
+
+<div class="theme-frame hidden" id="themeView">
+  <div class="chart-sub" id="themeSub">Share of themes</div>
+  <div class="theme-brands" id="themeBrands"></div>
+  <div class="theme-legend" id="themeLegend"></div>
+  <div class="note" style="margin-top:14px">Note: Labels with less than 4% have been excluded from the chart.<br>Source: Review Data</div>
+</div>
+
+<!-- COLUMN MAPPING MODAL -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modal">
+    <h2>Map Your Columns</h2>
+    <div class="desc">We found <strong id="modalRowCount">0</strong> rows across <strong id="modalSheetCount">1</strong> sheet(s). Select which sheet to use, then map your columns below.</div>
+
+    <div class="sheet-row">
+      <label>Sheet</label>
+      <select id="sheetSelect" onchange="onSheetChange()"></select>
+    </div>
+
+    <div id="previewArea"></div>
+
+    <div class="map-section">
+      <h3>Required Columns <span class="badge">REQUIRED</span></h3>
+      <div class="map-grid">
+        <div class="map-item"><label>Brand / Company</label><select id="mapBrand"></select></div>
+        <div class="map-item"><label>Sentiment</label><select id="mapSent"></select></div>
+        <div class="map-item"><label>Market / Region</label><select id="mapMarket"></select></div>
+      </div>
+    </div>
+
+    <div class="map-section">
+      <h3>Optional Columns <span class="badge opt">OPTIONAL</span></h3>
+      <div class="map-grid">
+        <div class="map-item"><label>Rating / Stars</label><select id="mapRating"></select></div>
+      </div>
+    </div>
+
+    <div class="map-section">
+      <h3>Theme Columns <span class="badge opt">OPTIONAL</span></h3>
+      <div class="desc" style="margin-bottom:8px;margin-top:-4px">Select columns that contain 0/1 theme tags. These enable the "Share of Themes" view.</div>
+      <div class="theme-picks" id="themePicks"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-go" onclick="applyMapping()">Load Data →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════ SANITIZED SAMPLE DATA ══════════
+// Brands: A through F   |   Markets: Market 1 through Market 6
+const DEFAULT_MARKET_SENT={
+  "Market 1":{
+    "Overall NPS":{"total":180,"Positive":110,"Neutral":8,"Negative":62},
+    "Brand A":{"total":52,"Positive":14,"Neutral":2,"Negative":36},
+    "Brand B":{"total":48,"Positive":40,"Neutral":2,"Negative":6},
+    "Brand C":{"total":30,"Positive":22,"Neutral":1,"Negative":7},
+    "Brand D":{"total":28,"Positive":20,"Neutral":2,"Negative":6},
+    "Brand E":{"total":22,"Positive":14,"Neutral":1,"Negative":7}
+  },
+  "Market 2":{
+    "Overall NPS":{"total":210,"Positive":155,"Neutral":10,"Negative":45},
+    "Brand A":{"total":35,"Positive":10,"Neutral":1,"Negative":24},
+    "Brand B":{"total":65,"Positive":55,"Neutral":3,"Negative":7},
+    "Brand C":{"total":40,"Positive":35,"Neutral":1,"Negative":4},
+    "Brand D":{"total":38,"Positive":30,"Neutral":3,"Negative":5},
+    "Brand F":{"total":32,"Positive":25,"Neutral":2,"Negative":5}
+  },
+  "Market 3":{
+    "Overall NPS":{"total":160,"Positive":88,"Neutral":7,"Negative":65},
+    "Brand A":{"total":45,"Positive":8,"Neutral":1,"Negative":36},
+    "Brand B":{"total":38,"Positive":30,"Neutral":2,"Negative":6},
+    "Brand D":{"total":42,"Positive":28,"Neutral":2,"Negative":12},
+    "Brand E":{"total":35,"Positive":22,"Neutral":2,"Negative":11}
+  },
+  "Market 4":{
+    "Overall NPS":{"total":240,"Positive":195,"Neutral":12,"Negative":33},
+    "Brand A":{"total":30,"Positive":8,"Neutral":1,"Negative":21},
+    "Brand B":{"total":80,"Positive":72,"Neutral":3,"Negative":5},
+    "Brand C":{"total":55,"Positive":50,"Neutral":4,"Negative":1},
+    "Brand D":{"total":40,"Positive":35,"Neutral":2,"Negative":3},
+    "Brand F":{"total":35,"Positive":30,"Neutral":2,"Negative":3}
+  },
+  "Market 5":{
+    "Overall NPS":{"total":150,"Positive":72,"Neutral":6,"Negative":72},
+    "Brand A":{"total":48,"Positive":10,"Neutral":2,"Negative":36},
+    "Brand B":{"total":32,"Positive":22,"Neutral":1,"Negative":9},
+    "Brand C":{"total":25,"Positive":15,"Neutral":1,"Negative":9},
+    "Brand D":{"total":25,"Positive":15,"Neutral":1,"Negative":9},
+    "Brand E":{"total":20,"Positive":10,"Neutral":1,"Negative":9}
+  },
+  "Market 6":{
+    "Overall NPS":{"total":190,"Positive":140,"Neutral":9,"Negative":41},
+    "Brand A":{"total":40,"Positive":12,"Neutral":2,"Negative":26},
+    "Brand B":{"total":55,"Positive":48,"Neutral":2,"Negative":5},
+    "Brand C":{"total":35,"Positive":30,"Neutral":2,"Negative":3},
+    "Brand D":{"total":30,"Positive":25,"Neutral":1,"Negative":4},
+    "Brand F":{"total":30,"Positive":25,"Neutral":2,"Negative":3}
+  }
+};
+
+const DEFAULT_OVERALL_SENT={
+  "Overall NPS":{"total":1130,"Positive":760,"Neutral":52,"Negative":318},
+  "Brand A":{"total":250,"Positive":62,"Neutral":9,"Negative":179},
+  "Brand B":{"total":318,"Positive":267,"Neutral":13,"Negative":38},
+  "Brand C":{"total":185,"Positive":152,"Neutral":9,"Negative":24},
+  "Brand D":{"total":203,"Positive":153,"Neutral":11,"Negative":39},
+  "Brand E":{"total":77,"Positive":46,"Neutral":4,"Negative":27},
+  "Brand F":{"total":97,"Positive":80,"Neutral":6,"Negative":11}
+};
+
+const DEFAULT_OVERALL_RATINGS={
+  "Overall NPS":3.8,
+  "Brand A":2.5,
+  "Brand B":4.5,
+  "Brand C":4.6,
+  "Brand D":4.1,
+  "Brand E":3.4,
+  "Brand F":4.4
+};
+
+const DEFAULT_MARKET_RATINGS={
+  "Market 1":{"Overall NPS":3.5,"Brand A":2.3,"Brand B":4.4,"Brand C":4.3,"Brand D":4.0,"Brand E":3.3},
+  "Market 2":{"Overall NPS":4.0,"Brand A":2.6,"Brand B":4.6,"Brand C":4.7,"Brand D":4.2,"Brand F":4.3},
+  "Market 3":{"Overall NPS":3.4,"Brand A":2.2,"Brand B":4.3,"Brand D":3.8,"Brand E":3.5},
+  "Market 4":{"Overall NPS":4.3,"Brand A":2.7,"Brand B":4.7,"Brand C":4.8,"Brand D":4.4,"Brand F":4.5},
+  "Market 5":{"Overall NPS":3.2,"Brand A":2.1,"Brand B":4.2,"Brand C":3.9,"Brand D":3.6,"Brand E":3.2},
+  "Market 6":{"Overall NPS":3.9,"Brand A":2.4,"Brand B":4.5,"Brand C":4.6,"Brand D":4.1,"Brand F":4.4}
+};
+
+const DEFAULT_THEME_DATA={
+  "Market 1":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":5,"Delivery & Execution":4,"Product Quality":3,"Pricing & Value":2,"Trust & Reliability":4,"Communication":2,"Other":1},"total":21},"Negative":{"counts":{"Customer Service":18,"Delivery & Execution":20,"Product Quality":10,"Pricing & Value":12,"Trust & Reliability":14,"Communication":10,"Other":2},"total":86}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":22,"Delivery & Execution":18,"Product Quality":14,"Pricing & Value":5,"Trust & Reliability":16,"Communication":10,"Other":2},"total":87},"Negative":{"counts":{"Customer Service":3,"Delivery & Execution":4,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":13}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":12,"Delivery & Execution":10,"Product Quality":8,"Pricing & Value":3,"Trust & Reliability":9,"Communication":6,"Other":1},"total":49},"Negative":{"counts":{"Customer Service":3,"Delivery & Execution":4,"Product Quality":3,"Pricing & Value":2,"Trust & Reliability":2,"Communication":1,"Other":0},"total":15}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":10,"Delivery & Execution":9,"Product Quality":7,"Pricing & Value":4,"Trust & Reliability":8,"Communication":5,"Other":1},"total":44},"Negative":{"counts":{"Customer Service":3,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":12}},
+    "Brand E":{"Positive":{"counts":{"Customer Service":6,"Delivery & Execution":7,"Product Quality":5,"Pricing & Value":2,"Trust & Reliability":5,"Communication":2,"Other":1},"total":28},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":5,"Product Quality":3,"Pricing & Value":2,"Trust & Reliability":3,"Communication":2,"Other":0},"total":19}}
+  },
+  "Market 2":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":4,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":3,"Communication":1,"Other":0},"total":14},"Negative":{"counts":{"Customer Service":12,"Delivery & Execution":14,"Product Quality":8,"Pricing & Value":9,"Trust & Reliability":10,"Communication":8,"Other":1},"total":62}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":30,"Delivery & Execution":25,"Product Quality":18,"Pricing & Value":8,"Trust & Reliability":22,"Communication":14,"Other":3},"total":120},"Negative":{"counts":{"Customer Service":3,"Delivery & Execution":4,"Product Quality":3,"Pricing & Value":1,"Trust & Reliability":2,"Communication":2,"Other":0},"total":15}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":18,"Delivery & Execution":16,"Product Quality":12,"Pricing & Value":5,"Trust & Reliability":14,"Communication":9,"Other":2},"total":76},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":1,"Trust & Reliability":1,"Communication":1,"Other":0},"total":8}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":15,"Delivery & Execution":13,"Product Quality":10,"Pricing & Value":4,"Trust & Reliability":12,"Communication":7,"Other":2},"total":63},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":11}},
+    "Brand F":{"Positive":{"counts":{"Customer Service":13,"Delivery & Execution":11,"Product Quality":8,"Pricing & Value":4,"Trust & Reliability":10,"Communication":6,"Other":1},"total":53},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":1,"Communication":1,"Other":0},"total":10}}
+  },
+  "Market 3":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":3,"Delivery & Execution":2,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":11},"Negative":{"counts":{"Customer Service":18,"Delivery & Execution":20,"Product Quality":10,"Pricing & Value":14,"Trust & Reliability":15,"Communication":10,"Other":1},"total":88}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":16,"Delivery & Execution":14,"Product Quality":10,"Pricing & Value":4,"Trust & Reliability":12,"Communication":8,"Other":2},"total":66},"Negative":{"counts":{"Customer Service":3,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":12}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":14,"Delivery & Execution":12,"Product Quality":9,"Pricing & Value":4,"Trust & Reliability":10,"Communication":6,"Other":1},"total":56},"Negative":{"counts":{"Customer Service":6,"Delivery & Execution":7,"Product Quality":4,"Pricing & Value":3,"Trust & Reliability":4,"Communication":3,"Other":0},"total":27}},
+    "Brand E":{"Positive":{"counts":{"Customer Service":10,"Delivery & Execution":9,"Product Quality":7,"Pricing & Value":3,"Trust & Reliability":8,"Communication":4,"Other":1},"total":42},"Negative":{"counts":{"Customer Service":5,"Delivery & Execution":6,"Product Quality":4,"Pricing & Value":3,"Trust & Reliability":4,"Communication":3,"Other":0},"total":25}}
+  },
+  "Market 4":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":3,"Delivery & Execution":2,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":2,"Communication":1,"Other":0},"total":11},"Negative":{"counts":{"Customer Service":10,"Delivery & Execution":12,"Product Quality":7,"Pricing & Value":8,"Trust & Reliability":9,"Communication":6,"Other":1},"total":53}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":38,"Delivery & Execution":32,"Product Quality":24,"Pricing & Value":10,"Trust & Reliability":28,"Communication":18,"Other":4},"total":154},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":1,"Communication":1,"Other":0},"total":10}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":26,"Delivery & Execution":22,"Product Quality":18,"Pricing & Value":7,"Trust & Reliability":20,"Communication":12,"Other":3},"total":108},"Negative":{"counts":{"Customer Service":1,"Delivery & Execution":1,"Product Quality":0,"Pricing & Value":0,"Trust & Reliability":0,"Communication":0,"Other":0},"total":2}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":18,"Delivery & Execution":15,"Product Quality":12,"Pricing & Value":5,"Trust & Reliability":14,"Communication":8,"Other":2},"total":74},"Negative":{"counts":{"Customer Service":1,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":1,"Trust & Reliability":1,"Communication":0,"Other":0},"total":6}},
+    "Brand F":{"Positive":{"counts":{"Customer Service":16,"Delivery & Execution":13,"Product Quality":10,"Pricing & Value":4,"Trust & Reliability":12,"Communication":7,"Other":2},"total":64},"Negative":{"counts":{"Customer Service":1,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":1,"Trust & Reliability":1,"Communication":0,"Other":0},"total":6}}
+  },
+  "Market 5":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":4,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":3,"Communication":1,"Other":0},"total":14},"Negative":{"counts":{"Customer Service":18,"Delivery & Execution":20,"Product Quality":10,"Pricing & Value":12,"Trust & Reliability":14,"Communication":10,"Other":2},"total":86}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":12,"Delivery & Execution":10,"Product Quality":8,"Pricing & Value":3,"Trust & Reliability":9,"Communication":6,"Other":1},"total":49},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":5,"Product Quality":3,"Pricing & Value":2,"Trust & Reliability":3,"Communication":2,"Other":0},"total":19}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":8,"Delivery & Execution":6,"Product Quality":5,"Pricing & Value":2,"Trust & Reliability":6,"Communication":4,"Other":1},"total":32},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":5,"Product Quality":3,"Pricing & Value":3,"Trust & Reliability":3,"Communication":2,"Other":0},"total":20}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":8,"Delivery & Execution":6,"Product Quality":5,"Pricing & Value":2,"Trust & Reliability":6,"Communication":3,"Other":1},"total":31},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":5,"Product Quality":3,"Pricing & Value":3,"Trust & Reliability":3,"Communication":2,"Other":0},"total":20}},
+    "Brand E":{"Positive":{"counts":{"Customer Service":5,"Delivery & Execution":4,"Product Quality":3,"Pricing & Value":1,"Trust & Reliability":4,"Communication":2,"Other":1},"total":20},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":5,"Product Quality":3,"Pricing & Value":3,"Trust & Reliability":3,"Communication":2,"Other":0},"total":20}}
+  },
+  "Market 6":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":5,"Delivery & Execution":4,"Product Quality":3,"Pricing & Value":1,"Trust & Reliability":3,"Communication":2,"Other":0},"total":18},"Negative":{"counts":{"Customer Service":13,"Delivery & Execution":15,"Product Quality":8,"Pricing & Value":10,"Trust & Reliability":11,"Communication":8,"Other":1},"total":66}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":25,"Delivery & Execution":22,"Product Quality":16,"Pricing & Value":7,"Trust & Reliability":20,"Communication":12,"Other":3},"total":105},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":3,"Product Quality":2,"Pricing & Value":1,"Trust & Reliability":1,"Communication":1,"Other":0},"total":10}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":16,"Delivery & Execution":13,"Product Quality":10,"Pricing & Value":4,"Trust & Reliability":12,"Communication":8,"Other":2},"total":65},"Negative":{"counts":{"Customer Service":1,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":0,"Trust & Reliability":1,"Communication":0,"Other":0},"total":5}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":13,"Delivery & Execution":11,"Product Quality":8,"Pricing & Value":3,"Trust & Reliability":10,"Communication":6,"Other":1},"total":52},"Negative":{"counts":{"Customer Service":2,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":1,"Trust & Reliability":1,"Communication":1,"Other":0},"total":8}},
+    "Brand F":{"Positive":{"counts":{"Customer Service":13,"Delivery & Execution":11,"Product Quality":8,"Pricing & Value":4,"Trust & Reliability":10,"Communication":6,"Other":1},"total":53},"Negative":{"counts":{"Customer Service":1,"Delivery & Execution":2,"Product Quality":1,"Pricing & Value":1,"Trust & Reliability":1,"Communication":0,"Other":0},"total":6}}
+  },
+  "__overall__":{
+    "Brand A":{"Positive":{"counts":{"Customer Service":24,"Delivery & Execution":18,"Product Quality":14,"Pricing & Value":7,"Trust & Reliability":17,"Communication":8,"Other":1},"total":89},"Negative":{"counts":{"Customer Service":89,"Delivery & Execution":101,"Product Quality":53,"Pricing & Value":65,"Trust & Reliability":73,"Communication":52,"Other":8},"total":441}},
+    "Brand B":{"Positive":{"counts":{"Customer Service":143,"Delivery & Execution":121,"Product Quality":90,"Pricing & Value":37,"Trust & Reliability":107,"Communication":68,"Other":15},"total":581},"Negative":{"counts":{"Customer Service":17,"Delivery & Execution":22,"Product Quality":14,"Pricing & Value":7,"Trust & Reliability":11,"Communication":8,"Other":0},"total":79}},
+    "Brand C":{"Positive":{"counts":{"Customer Service":80,"Delivery & Execution":67,"Product Quality":53,"Pricing & Value":21,"Trust & Reliability":61,"Communication":39,"Other":9},"total":330},"Negative":{"counts":{"Customer Service":11,"Delivery & Execution":14,"Product Quality":8,"Pricing & Value":6,"Trust & Reliability":7,"Communication":4,"Other":0},"total":50}},
+    "Brand D":{"Positive":{"counts":{"Customer Service":78,"Delivery & Execution":66,"Product Quality":51,"Pricing & Value":22,"Trust & Reliability":60,"Communication":35,"Other":8},"total":320},"Negative":{"counts":{"Customer Service":18,"Delivery & Execution":22,"Product Quality":13,"Pricing & Value":10,"Trust & Reliability":13,"Communication":8,"Other":0},"total":84}},
+    "Brand E":{"Positive":{"counts":{"Customer Service":21,"Delivery & Execution":20,"Product Quality":15,"Pricing & Value":6,"Trust & Reliability":17,"Communication":8,"Other":3},"total":90},"Negative":{"counts":{"Customer Service":13,"Delivery & Execution":16,"Product Quality":10,"Pricing & Value":8,"Trust & Reliability":10,"Communication":7,"Other":0},"total":64}},
+    "Brand F":{"Positive":{"counts":{"Customer Service":42,"Delivery & Execution":35,"Product Quality":26,"Pricing & Value":12,"Trust & Reliability":32,"Communication":19,"Other":4},"total":170},"Negative":{"counts":{"Customer Service":4,"Delivery & Execution":7,"Product Quality":4,"Pricing & Value":3,"Trust & Reliability":3,"Communication":1,"Other":0},"total":22}}
+  }
+};
+
+// ══════════ ACTIVE DATA ══════════
+let MARKET_SENT=DEFAULT_MARKET_SENT,OVERALL_SENT=DEFAULT_OVERALL_SENT;
+let OVERALL_RATINGS=DEFAULT_OVERALL_RATINGS,MARKET_RATINGS=DEFAULT_MARKET_RATINGS;
+let THEME_DATA=DEFAULT_THEME_DATA;
+let BRAND_ORDER_DYN=['Brand A','Brand B','Brand C','Brand D','Brand E','Brand F'];
+let SHORT={'Overall NPS':'Overall NPS','Brand A':'Brand A','Brand B':'Brand B','Brand C':'Brand C','Brand D':'Brand D','Brand E':'Brand E','Brand F':'Brand F'};
+let DYNAMIC_THEMES=[];
+const ORDER_BASE=['Overall NPS','Brand A','Brand B','Brand C','Brand D','Brand E','Brand F'];
+const THEME_STACK_ORDER=[2,5,3,1,4,0,6];
+const TC_MAP={'Customer Service':'#C8D8DC','Delivery & Execution':'#8BAAB0','Product Quality':'#5A7A82','Pricing & Value':'#9AAFC0','Trust & Reliability':'#1A1A1A','Communication':'#4A5A5E','Other':'#94C4AF'};
+const TC=['#C8D8DC','#8BAAB0','#5A7A82','#9AAFC0','#1A1A1A','#4A5A5E','#94C4AF','#C4A882','#6B8F71','#AA7B6F'];
+const BAR_H=340,THEME_H=320;
+let currentView='overall',currentMarket=null;
+
+// ══════════ MODAL LOGIC ══════════
+let uploadedWB=null, uploadedFileName='', parsedSheets={}, currentHeaders=[], currentData=[];
+
+function handleUpload(input){
+  const file=input.files[0];if(!file)return;
+  uploadedFileName=file.name;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      uploadedWB=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      parsedSheets={};
+      uploadedWB.SheetNames.forEach(name=>{
+        parsedSheets[name]=XLSX.utils.sheet_to_json(uploadedWB.Sheets[name],{header:1});
+      });
+      openModal();
+    }catch(err){alert('Error reading file: '+err.message)}
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+function openModal(){
+  const sel=document.getElementById('sheetSelect');
+  sel.innerHTML='';
+  uploadedWB.SheetNames.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n+' ('+((parsedSheets[n]||[]).length-1)+' rows)';sel.appendChild(o)});
+  if(uploadedWB.SheetNames.includes('Final Output'))sel.value='Final Output';
+  document.getElementById('modalSheetCount').textContent=uploadedWB.SheetNames.length;
+  onSheetChange();
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal(){document.getElementById('modalOverlay').classList.add('hidden')}
+
+function onSheetChange(){
+  const sheetName=document.getElementById('sheetSelect').value;
+  const rows=parsedSheets[sheetName]||[];
+  let hIdx=0;
+  for(let i=0;i<Math.min(5,rows.length);i++){
+    const filled=(rows[i]||[]).filter(c=>c!=null&&c.toString().trim()!=='').length;
+    if(filled>=3){hIdx=i;break}
+  }
+  currentHeaders=(rows[hIdx]||[]).map((h,i)=>h!=null?h.toString().trim():'Column_'+i);
+  currentData=rows.slice(hIdx+1);
+  document.getElementById('modalRowCount').textContent=currentData.length;
+
+  const preview=document.getElementById('previewArea');
+  let html='<table class="preview-table"><tr>';
+  currentHeaders.forEach(h=>{html+='<th>'+h+'</th>'});
+  html+='</tr>';
+  for(let i=0;i<Math.min(3,currentData.length);i++){
+    html+='<tr>';
+    currentHeaders.forEach((_,ci)=>{html+='<td>'+(currentData[i]&&currentData[i][ci]!=null?currentData[i][ci].toString().substring(0,30):'')+'</td>'});
+    html+='</tr>';
+  }
+  html+='</table>';
+  preview.innerHTML=html;
+
+  const none='<option value="-1">— Not mapped —</option>';
+  const opts=currentHeaders.map((h,i)=>'<option value="'+i+'">'+h+'</option>').join('');
+
+  ['mapBrand','mapSent','mapMarket','mapRating'].forEach(id=>{
+    document.getElementById(id).innerHTML=none+opts;
+  });
+
+  autoGuess('mapBrand',['brand','company','brand name','competitor']);
+  autoGuess('mapSent',['sentiment','sentiment_label','sentiment label','polarity']);
+  autoGuess('mapMarket',['market','region','location','geo','area','zone']);
+  autoGuess('mapRating',['rating','reviewrating','review rating','star','stars','score']);
+
+  const tp=document.getElementById('themePicks');tp.innerHTML='';
+  currentHeaders.forEach((h,i)=>{
+    const sample=currentData.slice(0,50).map(r=>r&&r[i]);
+    const vals=new Set(sample.filter(v=>v!=null).map(v=>v.toString()));
+    const isBinary=vals.size<=3&&(vals.has('1')||vals.has('0')||vals.has(1)||vals.has(0));
+    const lh=h.toLowerCase();
+    const isStd=['brand','sentiment','market','region','rating','url','id','state','city','date','text','review','name','uniqueid','detailsurl','brandid','reviewerid','numberreviews','full name'].some(s=>lh.includes(s));
+
+    if(isBinary&&!isStd){
+      const row=document.createElement('div');row.className='tp-row';
+      row.innerHTML='<input type="checkbox" checked data-idx="'+i+'"><span>'+h+'</span>';
+      tp.appendChild(row);
+    }
+  });
+  if(!tp.children.length)tp.innerHTML='<div style="font-size:11px;color:#aaa;font-style:italic">No binary (0/1) theme columns detected</div>';
+}
+
+function autoGuess(selectId,candidates){
+  const sel=document.getElementById(selectId);
+  const lHeaders=currentHeaders.map(h=>h.toLowerCase());
+  for(const c of candidates){
+    const idx=lHeaders.findIndex(h=>h.includes(c));
+    if(idx!==-1){sel.value=idx;return}
+  }
+}
+
+function applyMapping(){
+  const brandCol=parseInt(document.getElementById('mapBrand').value);
+  const sentCol=parseInt(document.getElementById('mapSent').value);
+  const marketCol=parseInt(document.getElementById('mapMarket').value);
+  const ratingCol=parseInt(document.getElementById('mapRating').value);
+
+  if(brandCol===-1||sentCol===-1||marketCol===-1){alert('Please map all 3 required columns: Brand, Sentiment, and Market.');return}
+
+  const themeIndices=[],themeNames=[];
+  document.querySelectorAll('#themePicks input[type=checkbox]:checked').forEach(cb=>{
+    const idx=parseInt(cb.dataset.idx);
+    themeIndices.push(idx);
+    themeNames.push(currentHeaders[idx]);
+  });
+  const hasThemes=themeIndices.length>0;
+
+  const data=currentData.filter(r=>r&&r[brandCol]!=null&&r[sentCol]!=null&&r[marketCol]!=null);
+  const hasThemeRow=r=>hasThemes&&themeIndices.some(i=>r[i]===1||r[i]==='1');
+  const mentionRows=data.filter(hasThemeRow);
+  const useMentions=hasThemes&&mentionRows.length>0;
+  const activeRows=useMentions?mentionRows:data;
+
+  const allBrands=[...new Set(activeRows.map(r=>r[brandCol].toString().trim()))].sort();
+  const allMarkets=[...new Set(activeRows.map(r=>r[marketCol].toString().trim()))].sort();
+
+  BRAND_ORDER_DYN=allBrands;
+  SHORT={'Overall NPS':'Overall NPS'};
+  allBrands.forEach(b=>{const parts=b.split(' - ');const words=parts[0].split(' ');if(words.length<=2)SHORT[b]=b;else{const mid=Math.ceil(words.length/2);SHORT[b]=words.slice(0,mid).join(' ')+'\n'+words.slice(mid).join(' ')}});
+  DYNAMIC_THEMES=themeNames;
+
+  function countSent(rows){const s={Positive:0,Neutral:0,Negative:0};rows.forEach(r=>{const v=(r[sentCol]||'').toString().trim();const vCap=v.charAt(0).toUpperCase()+v.slice(1).toLowerCase();if(s[vCap]!==undefined)s[vCap]++});return s}
+  function avgRat(rows){if(ratingCol===-1)return null;const vals=rows.map(r=>parseFloat(r[ratingCol])).filter(v=>!isNaN(v));return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10:null}
+
+  const newMS={},newMR={};
+  allMarkets.forEach(mkt=>{
+    const mRows=activeRows.filter(r=>r[marketCol].toString().trim()===mkt);
+    const md={};const mr={'Overall NPS':avgRat(data.filter(r=>r[marketCol].toString().trim()===mkt))};
+    const os=countSent(mRows);md['Overall NPS']={total:mRows.length,...os};
+    allBrands.forEach(b=>{const bRows=mRows.filter(r=>r[brandCol].toString().trim()===b);if(!bRows.length)return;md[b]={total:bRows.length,...countSent(bRows)};mr[b]=avgRat(data.filter(r=>r[brandCol].toString().trim()===b&&r[marketCol].toString().trim()===mkt))});
+    newMS[mkt]=md;newMR[mkt]=mr;
+  });
+
+  const newOS={},newOR={};
+  const os=countSent(activeRows);newOS['Overall NPS']={total:activeRows.length,...os};newOR['Overall NPS']=avgRat(data);
+  allBrands.forEach(b=>{const bRows=activeRows.filter(r=>r[brandCol].toString().trim()===b);if(!bRows.length)return;newOS[b]={total:bRows.length,...countSent(bRows)};newOR[b]=avgRat(data.filter(r=>r[brandCol].toString().trim()===b))});
+
+  const newTD={};
+  if(hasThemes){
+    const buildTheme=(rows,brand)=>{const bd={};['Positive','Negative'].forEach(sent=>{const subset=rows.filter(r=>{const v=(r[sentCol]||'').toString().trim();const vCap=v.charAt(0).toUpperCase()+v.slice(1).toLowerCase();return r[brandCol].toString().trim()===brand&&vCap===sent});const counts={};let total=0;themeNames.forEach((t,ti)=>{const c=subset.filter(r=>r[themeIndices[ti]]===1||r[themeIndices[ti]]==='1').length;counts[t]=c;total+=c});bd[sent]={counts,total}});return bd};
+    allMarkets.forEach(mkt=>{const mRows=activeRows.filter(r=>r[marketCol].toString().trim()===mkt);const md={};allBrands.forEach(b=>{if(mRows.some(r=>r[brandCol].toString().trim()===b))md[b]=buildTheme(mRows,b)});newTD[mkt]=md});
+    const od={};allBrands.forEach(b=>{od[b]=buildTheme(activeRows,b)});newTD['__overall__']=od;
+  }
+
+  MARKET_SENT=newMS;OVERALL_SENT=newOS;OVERALL_RATINGS=newOR;MARKET_RATINGS=newMR;
+  THEME_DATA=Object.keys(newTD).length?newTD:{};
+  currentMarket=allMarkets[0]||null;
+
+  document.getElementById('fileInfo').innerHTML='Loaded <span class="fname">'+uploadedFileName+'</span> · '+data.length+' reviews · '+(useMentions?activeRows.length+' mentions · ':'')+allMarkets.length+' markets · '+allBrands.length+' brands'+(hasThemes?' · '+themeNames.length+' themes':'');
+
+  closeModal();
+  buildPills();
+  refresh();
+}
+
+// ══════════ UI ══════════
+function buildPills(){
+  const p=document.getElementById('pills');p.innerHTML='';
+  Object.keys(MARKET_SENT).sort().forEach(m=>{const b=document.createElement('button');b.className='pill';b.textContent=m;b.onclick=()=>{currentMarket=m;refresh()};p.appendChild(b)});
+  if(!currentMarket){const mk=Object.keys(MARKET_SENT).sort();if(mk.length)currentMarket=mk[0]}
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{btn.onclick=()=>{currentView=btn.dataset.view;refresh()}});
+
+function pct(n,t){return t?Math.round(n/t*100):0}
+function getOrderFn(){return(a,b)=>{let ai=ORDER_BASE.indexOf(a),bi=ORDER_BASE.indexOf(b);if(ai<0)ai=BRAND_ORDER_DYN.indexOf(a)+100;if(bi<0)bi=BRAND_ORDER_DYN.indexOf(b)+100;if(ai<0)ai=999;if(bi<0)bi=999;return ai-bi}}
+
+function refresh(){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
+  document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('active',p.textContent===currentMarket));
+  const showMkt=currentView==='market'||currentView==='themes';
+  document.getElementById('mktGroup').classList.toggle('hidden',!showMkt);
+  document.getElementById('sentView').classList.toggle('hidden',currentView==='themes');
+  document.getElementById('themeView').classList.toggle('hidden',currentView!=='themes');
+  if(currentView==='overall')renderSentiment(OVERALL_SENT,OVERALL_RATINGS,'Brand mentions – by sentiment type');
+  else if(currentView==='market'&&currentMarket)renderSentiment(MARKET_SENT[currentMarket],MARKET_RATINGS[currentMarket],'Brand mentions – by sentiment type (<span>'+currentMarket+'</span>)');
+  else if(currentView==='themes')renderThemes();
+}
+
+function renderSentiment(data,ratings,subtitle){
+  if(!data)return;
+  document.getElementById('chartSub').innerHTML=subtitle;
+  const sortFn=getOrderFn();
+  const brands=Object.keys(data).sort(sortFn);
+  const ranked=brands.filter(b=>b!=='Overall NPS').map(b=>({name:b,net:pct(data[b].Positive,data[b].total)-pct(data[b].Negative,data[b].total)})).sort((a,b)=>a.net-b.net);
+  const worst=ranked.slice(0,2).map(r=>r.name);
+  const mktLabel=currentView==='market'&&currentMarket?' in '+currentMarket:'';
+  document.getElementById('title').textContent=worst.join(' and ')+' lag the most'+mktLabel+' with heavily skewed negative feedback compared to peers';
+  const barsRow=document.getElementById('barsRow'),ratingRow=document.getElementById('ratingRow'),netRow=document.getElementById('netRow');
+  barsRow.innerHTML='';ratingRow.innerHTML='';netRow.innerHTML='';
+  brands.forEach(brand=>{
+    const d=data[brand],posPct=pct(d.Positive,d.total),neuPct=pct(d.Neutral,d.total),negPct=100-posPct-neuPct,net=posPct-negPct;
+    const col=document.createElement('div');col.className='bar-col';col.innerHTML='<div class="bar-n">'+d.total.toLocaleString()+'</div>';
+    const stack=document.createElement('div');stack.className='stack';stack.style.height=BAR_H+'px';
+    stack.appendChild(makeSeg('sn',negPct));stack.appendChild(makeSeg('su',neuPct));stack.appendChild(makeSeg('sp',posPct));col.appendChild(stack);
+    const lbl=document.createElement('div');lbl.className='blbl';lbl.innerHTML=(SHORT[brand]||brand).replace(/\n/g,'<br>');col.appendChild(lbl);barsRow.appendChild(col);
+    const rc=document.createElement('div');rc.className='bot-cell';const avgR=ratings&&ratings[brand]!=null?ratings[brand]:'–';
+    rc.innerHTML='<div class="bot-title">Average rating</div><div class="bot-val" style="color:var(--tx)">'+avgR+'</div>';ratingRow.appendChild(rc);
+    const nc=document.createElement('div');nc.className='bot-cell';
+    nc.innerHTML='<div class="bot-title">Net Sentiment</div><div class="bot-val '+(net>=0?'grn':'red')+'">'+(net>=0?'+':'')+net+'%</div>';netRow.appendChild(nc);
+  });
+  requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll('.seg').forEach(s=>s.classList.add('show')),80));
+}
+function makeSeg(cls,p){const el=document.createElement('div');el.className='seg '+cls;el.style.height=(p/100*BAR_H)+'px';if(p>=4){const lb=document.createElement('span');lb.className='lb';lb.textContent=p+'%';el.appendChild(lb)}return el}
+
+function renderThemes(){
+  if(!currentMarket)return;
+  const td=THEME_DATA[currentMarket]||{};
+  const themes=DYNAMIC_THEMES.length?DYNAMIC_THEMES:['Customer Service','Delivery & Execution','Product Quality','Pricing & Value','Trust & Reliability','Communication','Other'];
+  document.getElementById('themeSub').innerHTML='Share of themes (<span>'+currentMarket+'</span>)';
+  document.getElementById('title').textContent='Theme breakdown by brand and sentiment – '+currentMarket;
+  const container=document.getElementById('themeBrands');container.innerHTML='';
+  const brandsPresent=BRAND_ORDER_DYN.filter(b=>td[b]);
+  brandsPresent.forEach(brand=>{
+    const grp=document.createElement('div');grp.className='theme-brand-group';
+    const pair=document.createElement('div');pair.className='theme-pair';
+    ['Positive','Negative'].forEach(sent=>{
+      const col=document.createElement('div');col.className='theme-col';
+      const sd=td[brand]&&td[brand][sent]?td[brand][sent]:{counts:{},total:0};
+      col.innerHTML='<div class="theme-n">'+(sd.total||0)+'</div><div class="theme-col-label">'+sent+'</div>';
+      if(!sd.total){const nd=document.createElement('div');nd.className='no-data';nd.style.height=THEME_H+'px';nd.textContent='No '+sent.toLowerCase()+' verbatim';col.appendChild(nd)}
+      else{const stack=document.createElement('div');stack.className='theme-stack';stack.style.height=THEME_H+'px';
+        const useOrder=DYNAMIC_THEMES.length===0;
+        const order=useOrder?THEME_STACK_ORDER:themes.map((_,i)=>i);
+        order.forEach(i=>{const t=themes[i];const count=sd.counts[t]||0;const p=pct(count,sd.total);const seg=document.createElement('div');seg.className='theme-seg';seg.style.height=(p/100*THEME_H)+'px';const color=TC_MAP[t]||TC[i%TC.length];seg.style.background=color;if(color==='#1A1A1A'||color==='#4A5A5E'||color==='#5A7A82')seg.style.color='#fff';if(p>=4){const lb=document.createElement('span');lb.className='lb';lb.textContent=p+'%';seg.appendChild(lb)}stack.appendChild(seg)});
+        col.appendChild(stack)}
+      pair.appendChild(col);
+    });
+    grp.appendChild(pair);const title=document.createElement('div');title.className='theme-brand-title';title.innerHTML=(SHORT[brand]||brand).replace(/\n/g,' ');grp.appendChild(title);container.appendChild(grp);
+  });
+  const leg=document.getElementById('themeLegend');leg.innerHTML='';
+  const legendOrder=DYNAMIC_THEMES.length===0?[2,5,3,1,0,4,6]:themes.map((_,i)=>i);
+  legendOrder.forEach(i=>{const t=themes[i];const color=TC_MAP[t]||TC[i%TC.length];const item=document.createElement('div');item.className='tl-i';item.innerHTML='<div class="tl-d" style="background:'+color+'"></div>'+t;leg.appendChild(item)});
+  requestAnimationFrame(()=>setTimeout(()=>document.querySelectorAll('.theme-seg').forEach(s=>s.classList.add('show')),80));
+}
+
+// INIT
+buildPills();currentMarket='Market 1';refresh();
+</script>
+</body>
+</html>
